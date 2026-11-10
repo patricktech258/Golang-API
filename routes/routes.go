@@ -14,6 +14,7 @@ func SetupRoutes(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("GET /users/{id}", handlers.GetUser(db))
 	mux.HandleFunc("PUT /users/{id}", handlers.UpdateUser(db))
 	mux.HandleFunc("DELETE /users/{id}", handlers.DeleteUser(db))
+	mux.HandleFunc("POST /upload", handlers.UploadHandler(db))
 
 	return mux
 }

@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	model "example/main/models"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 )
@@ -169,5 +171,92 @@ func DeleteUser(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func UploadHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+
+		// recebe o arquivo
+		file, header, err := r.FormFile("file")
+
+		if err != nil {
+			http.Error(w, "Erro ao receber o arquivo", http.StatusBadRequest)
+			return
+		}
+
+		defer file.Close()
+
+		/* criar pasta e salvar arquivo */
+		// if err := os.MkdirAll("./uploads", 0755); err != nil {
+		// 	http.Error(w, "Erro ao criar diretórios", http.StatusInternalServerError)
+		// 	return
+		// }
+
+		// filename := filepath.Base(header.Filename)
+
+		// if filename == "." || filename == string(filepath.Separator) {
+		// 	http.Error(w, "Nome de arquivo inválido", http.StatusBadRequest)
+		// 	return
+		// }
+
+		// destination, err := os.CreateTemp("./uploads", "upload-*")
+
+		// if err != nil {
+		// 	http.Error(w, "erro ao criar arquivo", http.StatusInternalServerError)
+		// 	return
+		// }
+
+		// defer destination.Close()
+
+		// if _, err := io.Copy(destination, file); err != nil {
+		// 	os.Remove(destination.Name())
+		// 	http.Error(w, "Erro ao salvar arquivo", http.StatusInternalServerError)
+		// 	return
+		// }
+
+		reader := csv.NewReader(file)
+		reader.Comma = ';'
+
+		columns, err := reader.Read()
+
+		if err != nil {
+			http.Error(w, "CSV vazio e inválido", http.StatusBadRequest)
+			return
+		}
+
+		var data []map[string]string
+
+		for {
+			record, err := reader.Read()
+
+			if err == io.EOF {
+				break
+			}
+
+			if err != nil {
+				http.Error(w, "Erro ao ler CSV", http.StatusBadRequest)
+				return
+			}
+
+			row := make(map[string]string)
+
+			for i, column := range columns {
+				row[column] = record[i]
+			}
+
+			data = append(data, row)
+		}
+
+		response := model.CSVResponse{
+			Filename: header.Filename,
+			Total:    len(data),
+			Data:     data,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
 	}
 }
